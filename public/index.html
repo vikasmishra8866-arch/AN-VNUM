@@ -215,7 +215,6 @@
         </div>
 
         <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <!-- Card with Copy Button inside -->
           <div class="bg-slate-900/40 border border-slate-800/80 rounded-xl p-4 flex justify-between items-center">
             <div>
               <div class="flex items-center space-x-2 text-slate-400 text-xs mb-1">
@@ -335,25 +334,25 @@
 
       <div class="text-center">
         <h2 class="text-xl font-bold text-slate-100">Add Wallet Balance</h2>
-        <p class="text-xs text-slate-400 mt-1">Select a business plan & scan UPI QR Code</p>
+        <p class="text-xs text-slate-400 mt-1">Select a plan & scan UPI QR Code</p>
       </div>
 
       <!-- Plan Selection Cards -->
       <div class="grid grid-cols-3 gap-2">
-        <button onclick="selectPlan('starter', 100, 2)" id="plan-starter" class="plan-card p-3 rounded-xl border border-slate-700 bg-slate-900/60 text-center hover:border-cyan-400 transition-all">
+        <button onclick="selectPlan('starter', 100, 2, 'Starter Pack')" id="plan-starter" class="plan-card p-3 rounded-xl border border-slate-700 bg-slate-900/60 text-center hover:border-cyan-400 transition-all">
           <span class="text-[10px] text-slate-400 uppercase block font-semibold">Starter</span>
           <span class="text-base font-extrabold text-cyan-400">₹100</span>
           <span class="text-[10px] text-slate-300 block mt-0.5">2 Searches</span>
         </button>
 
-        <button onclick="selectPlan('popular', 500, 12)" id="plan-popular" class="plan-card p-3 rounded-xl border-2 border-cyan-400 bg-cyan-950/20 text-center relative">
+        <button onclick="selectPlan('popular', 500, 12, 'Popular Standard Pack')" id="plan-popular" class="plan-card p-3 rounded-xl border-2 border-cyan-400 bg-cyan-950/20 text-center relative">
           <span class="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-cyan-500 text-slate-950 text-[9px] font-black px-1.5 py-0.2 rounded-full uppercase">Popular</span>
           <span class="text-[10px] text-slate-400 uppercase block font-semibold">Standard</span>
           <span class="text-base font-extrabold text-cyan-400">₹500</span>
           <span class="text-[10px] text-emerald-400 block mt-0.5 font-bold">12 Searches</span>
         </button>
 
-        <button onclick="selectPlan('vip', 1000, 30)" id="plan-vip" class="plan-card p-3 rounded-xl border border-slate-700 bg-slate-900/60 text-center hover:border-cyan-400 transition-all">
+        <button onclick="selectPlan('vip', 1000, 30, 'VIP Business Pack')" id="plan-vip" class="plan-card p-3 rounded-xl border border-slate-700 bg-slate-900/60 text-center hover:border-cyan-400 transition-all">
           <span class="text-[10px] text-amber-400 uppercase block font-semibold">Best Value</span>
           <span class="text-base font-extrabold text-cyan-400">₹1000</span>
           <span class="text-[10px] text-emerald-400 block mt-0.5 font-bold">30 Searches</span>
@@ -374,9 +373,21 @@
         <p class="text-[11px] text-slate-400">Pay to UPI: <strong class="text-slate-200">9696159863.wallet@phonepe</strong></p>
       </div>
 
-      <!-- Action Button -->
-      <button onclick="submitPaymentNotify()" class="w-full py-3 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold rounded-xl text-sm glow-button">
-        I HAVE COMPLETED PAYMENT
+      <!-- WhatsApp Screenshot Instruction Box -->
+      <div class="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-3 flex items-center space-x-3 text-left">
+        <div class="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
+          <i data-lucide="message-square" class="w-6 h-6"></i>
+        </div>
+        <div class="text-xs">
+          <p class="text-emerald-300 font-bold">Payment ke baad Screenshot zaroor bhejein!</p>
+          <p class="text-slate-300 text-[11px] mt-0.5">WhatsApp par screenshot bhejte hi access instant active kar diya jayega.</p>
+        </div>
+      </div>
+
+      <!-- Action Button (Triggers API Request + Redirects to WhatsApp) -->
+      <button onclick="submitPaymentAndRedirectWhatsApp()" class="w-full py-3.5 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-sm glow-button flex items-center justify-center space-x-2">
+        <i data-lucide="send" class="w-4 h-4"></i>
+        <span>SEND SCREENSHOT ON WHATSAPP</span>
       </button>
     </div>
   </div>
@@ -389,9 +400,7 @@
   <script>
     lucide.createIcons();
 
-    // ----------------------------------------------------
-    // Security Locks (Context menu & F12 key locks)
-    // ----------------------------------------------------
+    // Security Locks
     document.addEventListener('contextmenu', e => e.preventDefault());
     document.addEventListener('keydown', e => {
       if (
@@ -403,7 +412,7 @@
       }
     });
 
-    // User Session / ID Initialization
+    // User Session Initialization
     let userId = localStorage.getItem('vahan_user_id');
     if (!userId) {
       userId = 'USR_' + Math.random().toString(36).substring(2, 9).toUpperCase();
@@ -412,15 +421,15 @@
 
     let userBalance = 0;
     let selectedPlan = 'popular';
+    let selectedPlanName = 'Popular Standard Pack';
     let selectedAmount = 500;
     let selectedSearches = 12;
     let qrCountdownInterval = null;
-    let currentRawData = null;
 
     const UPI_ID = "9696159863.wallet@phonepe";
     const MERCHANT_NAME = "Vikas Kumar Mishra";
+    const WHATSAPP_NUMBER = "918960023923";
 
-    // Initialize Balance
     async function fetchUserBalance() {
       try {
         const res = await fetch(`/api/user/balance?userId=${userId}`);
@@ -446,12 +455,9 @@
       document.getElementById('vehInput').value = '';
     }
 
-    // ----------------------------------------------------
-    // Payment Modal & Dynamic QR Generation
-    // ----------------------------------------------------
     function openPaymentModal() {
       document.getElementById('paymentModal').classList.remove('hidden');
-      selectPlan('popular', 500, 12);
+      selectPlan('popular', 500, 12, 'Popular Standard Pack');
     }
 
     function closePaymentModal() {
@@ -459,10 +465,11 @@
       clearInterval(qrCountdownInterval);
     }
 
-    function selectPlan(planId, amount, searches) {
+    function selectPlan(planId, amount, searches, name) {
       selectedPlan = planId;
       selectedAmount = amount;
       selectedSearches = searches;
+      selectedPlanName = name;
 
       document.querySelectorAll('.plan-card').forEach(c => {
         c.classList.remove('border-2', 'border-cyan-400');
@@ -474,7 +481,7 @@
       selectedEl.classList.add('border-2', 'border-cyan-400');
 
       generateDynamicQR(amount);
-      startQRTimer(240); // 4 Minutes
+      startQRTimer(240);
     }
 
     function generateDynamicQR(amount) {
@@ -501,25 +508,41 @@
       }, 1000);
     }
 
-    async function submitPaymentNotify() {
+    // ----------------------------------------------------
+    // WhatsApp Auto Redirect with Dynamic Pre-filled Message
+    // ----------------------------------------------------
+    async function submitPaymentAndRedirectWhatsApp() {
       const txnRef = 'TXN_' + Date.now();
+      
+      // 1. Send Request to Telegram Admin Panel in Background
       try {
-        const res = await fetch('/api/payment/request', {
+        await fetch('/api/payment/request', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userId, planId: selectedPlan, txnId: txnRef })
         });
-        const data = await res.json();
-        if (data.success) {
-          showToast("Payment request submitted! Balance will update after Admin Approval.");
-          closePaymentModal();
-        }
-      } catch (e) {
-        showToast("Network error. Try again.");
-      }
+      } catch (e) {}
+
+      // 2. Format Automatic WhatsApp Message
+      const waMessage = `Hello Admin, Maine Vahan Info Portal per payment kar diya hai.\n\n` +
+                        `📌 *Payment Details:*\n` +
+                        `👤 *User ID:* ${userId}\n` +
+                        `📦 *Selected Plan:* ${selectedPlanName}\n` +
+                        `💰 *Amount Paid:* ₹${selectedAmount}\n` +
+                        `🔍 *Searches Added:* ${selectedSearches} Searches\n` +
+                        `🆔 *Reference ID:* ${txnRef}\n\n` +
+                        `Maine screenshot attach kar diya hai, kripya mera access active karein!`;
+
+      const encodedMessage = encodeURIComponent(waMessage);
+      const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
+
+      showToast("Redirecting to WhatsApp...");
+      closePaymentModal();
+
+      // Open WhatsApp Chat
+      window.open(whatsappUrl, '_blank');
     }
 
-    // Copying Specific Fields Directly
     function copySingleValue(elementId) {
       const val = document.getElementById(elementId).innerText;
       if (val && val !== '---') {
@@ -528,9 +551,6 @@
       }
     }
 
-    // ----------------------------------------------------
-    // Search Execution & Deduct Balance Logic
-    // ----------------------------------------------------
     async function handleSearch(event) {
       event.preventDefault();
 
@@ -552,7 +572,6 @@
         const data = await response.json();
 
         if (data && data.status === "success" && data.data && data.data.details) {
-          // DEDUCT BALANCE ONLY IF DATA FOUND SUCCESSFULLY
           const deductRes = await fetch('/api/user/deduct', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
