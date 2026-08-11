@@ -12,7 +12,7 @@ app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3000;
 
-// Hardcoded Fallback Token & Chat ID for Guaranteed Delivery
+// Telegram & Merchant Configurations
 const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8643283794:AAHblVi7p6D0LniqKPuXxytHaW8TbaGrJiE';
 const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || '8204069256';
 
@@ -28,38 +28,35 @@ const PLANS = {
 };
 
 // ----------------------------------------------------
-// 1. Health Check Endpoint (For UptimeRobot 24/7 Ping)
+// 1. Health Check Endpoint
 // ----------------------------------------------------
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
-});
-
-app.get('/ping', (req, res) => {
-  res.status(200).json({ status: 'alive', timestamp: new Date() });
-});
+app.get('/health', (req, res) => res.status(200).send('OK'));
+app.get('/ping', (req, res) => res.status(200).json({ status: 'alive', timestamp: new Date() }));
 
 // ----------------------------------------------------
-// 2. User Balance & Sync APIs
+// 2. User Balance Sync & Auto Account Creation
 // ----------------------------------------------------
 app.get('/api/user/balance', (req, res) => {
   const userId = req.query.userId;
   if (!userId) return res.status(400).json({ error: 'User ID required' });
 
-  db.get('SELECT balance FROM users WHERE userId = ?', [userId], (err, row) => {
+  const cleanUserId = String(userId).trim().toUpperCase();
+
+  db.get('SELECT balance FROM users WHERE userId = ?', [cleanUserId], (err, row) => {
     if (err) return res.status(500).json({ error: 'DB Error' });
     if (!row) {
-      db.run('INSERT INTO users (userId, balance) VALUES (?, ?)', [userId, 0], (err2) => {
+      db.run('INSERT INTO users (userId, balance) VALUES (?, ?)', [cleanUserId, 0], (err2) => {
         if (err2) return res.status(500).json({ error: 'DB Error' });
-        return res.json({ userId, balance: 0 });
+        return res.json({ userId: cleanUserId, balance: 0 });
       });
     } else {
-      return res.json({ userId, balance: row.balance });
+      return res.json({ userId: cleanUserId, balance: row.balance });
     }
   });
 });
 
 // ----------------------------------------------------
-// NEW: Instant Plan Selection Notification + 11 Hours Auto Delete
+// 3. Instant Plan Selection Notification (Telegram + Auto Delete)
 // ----------------------------------------------------
 app.post('/api/notify-plan-click', async (req, res) => {
   const { planName, amount, userId } = req.body;
@@ -72,7 +69,6 @@ app.post('/api/notify-plan-click', async (req, res) => {
                   `ℹ️ _Yeh notification 11 ghante baad automatic delete ho jayegi._`;
 
   try {
-    // 1. Send Telegram Notification
     const tgRes = await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
       chat_id: ADMIN_CHAT_ID,
       text: message,
@@ -81,46 +77,41 @@ app.post('/api/notify-plan-click', async (req, res) => {
 
     const messageId = tgRes.data.result.message_id;
 
-    // 2. Schedule Auto Delete after 11 Hours (11 * 60 * 60 * 1000 ms)
-    const ELEVEN_HOURS_MS = 11 * 60 * 60 * 1000;
     setTimeout(async () => {
       try {
         await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/deleteMessage`, {
           chat_id: ADMIN_CHAT_ID,
           message_id: messageId
         });
-        console.log(`Telegram message ${messageId} automatically deleted after 11 hours.`);
-      } catch (delErr) {
-        console.error('Auto-delete error:', delErr.message);
-      }
-    }, ELEVEN_HOURS_MS);
+      } catch (delErr) {}
+    }, 11 * 60 * 60 * 1000);
 
-    return res.status(200).json({ success: true, message: 'Notification sent and delete timer set.' });
+    return res.status(200).json({ success: true });
   } catch (err) {
-    console.error('Plan selection notify failed:', err.message);
     return res.status(500).json({ success: false, error: err.message });
   }
 });
 
 // ----------------------------------------------------
-// 3. Payment Request & Telegram Webhook Broadcast
+// 4. Payment Request Submission
 // ----------------------------------------------------
 app.post('/api/payment/request', async (req, res) => {
   const { userId, planId, txnId } = req.body;
   const plan = PLANS[planId];
+  const cleanUserId = String(userId).trim().toUpperCase();
 
-  if (!plan || !userId || !txnId) {
+  if (!plan || !cleanUserId || !txnId) {
     return res.status(400).json({ error: 'Invalid Payment Request' });
   }
 
   db.run(
     'INSERT INTO transactions (txnId, userId, planId, amount, searches, status) VALUES (?, ?, ?, ?, ?, ?)',
-    [txnId, userId, planId, plan.amount, plan.searches, 'PENDING'],
+    [txnId, cleanUserId, planId, plan.amount, plan.searches, 'PENDING'],
     async (err) => {
       if (err) return res.status(500).json({ error: 'Failed to record transaction' });
 
       const message = `🔔 *NEW ADD BALANCE REQUEST*\n\n` +
-                      `👤 *User ID:* \`${userId}\`\n` +
+                      `👤 *User ID:* \`${cleanUserId}\`\n` +
                       `📦 *Plan:* ${plan.name}\n` +
                       `💰 *Amount:* ₹${plan.amount}\n` +
                       `🔍 *Searches Added:* +${plan.searches}\n` +
@@ -144,7 +135,6 @@ app.post('/api/payment/request', async (req, res) => {
           reply_markup: inlineKeyboard
         });
 
-        // Payment approval request ko bhi 11 ghante baad delete karne ke liye:
         const messageId = tgRes.data.result.message_id;
         setTimeout(async () => {
           try {
@@ -155,9 +145,7 @@ app.post('/api/payment/request', async (req, res) => {
           } catch (e) {}
         }, 11 * 60 * 60 * 1000);
 
-      } catch (tgErr) {
-        console.error('Telegram notification failed:', tgErr.message);
-      }
+      } catch (tgErr) {}
 
       return res.json({ success: true, message: 'Request submitted to admin for approval' });
     }
@@ -165,7 +153,7 @@ app.post('/api/payment/request', async (req, res) => {
 });
 
 // ----------------------------------------------------
-// 4. Telegram Webhook Listener for Admin [Approve/Reject]
+// 5. Telegram Webhook Callback Handler
 // ----------------------------------------------------
 app.post('/telegram/webhook', async (req, res) => {
   const body = req.body;
@@ -237,19 +225,21 @@ async function editTelegramMessage(chatId, messageId, text) {
 }
 
 // ----------------------------------------------------
-// 5. Deduct Balance API (ONLY IF DATA FOUND)
+// 6. Deduct Balance API
 // ----------------------------------------------------
 app.post('/api/user/deduct', (req, res) => {
   const { userId } = req.body;
   if (!userId) return res.status(400).json({ error: 'User ID required' });
 
-  db.get('SELECT balance FROM users WHERE userId = ?', [userId], (err, row) => {
+  const cleanUserId = String(userId).trim().toUpperCase();
+
+  db.get('SELECT balance FROM users WHERE userId = ?', [cleanUserId], (err, row) => {
     if (err) return res.status(500).json({ error: 'DB Error' });
     if (!row || row.balance < 50) {
       return res.status(402).json({ error: 'Insufficient balance. Minimum ₹50 required.' });
     }
 
-    db.run('UPDATE users SET balance = balance - 50 WHERE userId = ?', [userId], function(err2) {
+    db.run('UPDATE users SET balance = balance - 50 WHERE userId = ?', [cleanUserId], function(err2) {
       if (err2) return res.status(500).json({ error: 'Failed to deduct balance' });
       return res.json({ success: true, remainingBalance: row.balance - 50 });
     });
@@ -257,7 +247,7 @@ app.post('/api/user/deduct', (req, res) => {
 });
 
 // ----------------------------------------------------
-// 6. External Vahan Lookup Handler
+// 7. Vahan API Route
 // ----------------------------------------------------
 app.get('/api/vahan', async (req, res) => {
   const veh = req.query.veh;
@@ -273,7 +263,7 @@ app.get('/api/vahan', async (req, res) => {
   }
 });
 
-// Auto Set Telegram Webhook on startup
+// App Listen
 app.listen(PORT, async () => {
   console.log(`Server running on port ${PORT}`);
   if (TELEGRAM_TOKEN && PUBLIC_SERVER_URL) {
@@ -282,8 +272,6 @@ app.listen(PORT, async () => {
         url: `${PUBLIC_SERVER_URL}/telegram/webhook`
       });
       console.log('Telegram Webhook Automatically Registered.');
-    } catch (e) {
-      console.warn('Webhook auto-registration notice:', e.message);
-    }
+    } catch (e) {}
   }
 });
