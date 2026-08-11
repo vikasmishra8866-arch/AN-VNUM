@@ -540,7 +540,7 @@
       generateDynamicQR(amount);
       startQRTimer(240);
 
-      // Instant Plan Selection Notification to Telegram Backend
+      // Instant Plan Selection Notification to Backend
       try {
         await fetch('/api/notify-plan-click', {
           method: 'POST',
@@ -715,21 +715,24 @@
     }
 
     function renderVehicleDetails(details, searchedVal) {
-      document.getElementById('resRegNo').innerText = extractCleanKey(details, ['reg_no', 'registration', 'rc_number']) !== 'N/A' 
-        ? extractCleanKey(details, ['reg_no', 'registration', 'rc_number']) 
+      const getVal = (keys) => extractCleanKey(details, keys);
+
+      document.getElementById('resRegNo').innerText = getVal(['reg_no', 'registration', 'rc_number']) !== 'N/A' 
+        ? getVal(['reg_no', 'registration', 'rc_number']) 
         : searchedVal.toUpperCase();
 
-      document.getElementById('resRTO').innerText = extractCleanKey(details, ['rto', 'state', 'authority']);
-      document.getElementById('resOwner').innerText = extractCleanKey(details, ['owner', 'owner_name']);
-      document.getElementById('resModel').innerText = extractCleanKey(details, ['make/model', 'model', 'vehicle_class', 'maker']);
-      document.getElementById('resFuel').innerText = extractCleanKey(details, ['fuel', 'fuel_type']);
-      document.getElementById('resRegDate').innerText = extractCleanKey(details, ['reg_date', 'registration_date', 'date']);
-      document.getElementById('resChassis').innerText = extractCleanKey(details, ['chassis', 'chassis_no']);
-      document.getElementById('resEngine').innerText = extractCleanKey(details, ['engine', 'engine_no']);
-      document.getElementById('resMobile').innerText = extractCleanKey(details, ['mobile', 'phone']);
-      document.getElementById('resAddress').innerText = extractCleanKey(details, ['address', 'location']);
+      document.getElementById('resOwner').innerText = getVal(['owner', 'owner_name', 'name']);
+      document.getElementById('resModel').innerText = getVal(['maker_model', 'model', 'vehicle_class', 'desc']);
+      document.getElementById('resFuel').innerText = getVal(['fuel', 'fuel_type']);
+      document.getElementById('resRegDate').innerText = getVal(['registration_date', 'reg_date', 'date']);
+      document.getElementById('resChassis').innerText = getVal(['chassis', 'chassis_number', 'chassis_no']);
+      document.getElementById('resEngine').innerText = getVal(['engine', 'engine_number', 'engine_no']);
+      document.getElementById('resMobile').innerText = getVal(['mobile', 'phone', 'contact']);
+      document.getElementById('resAddress').innerText = getVal(['address', 'present_address', 'permanent_address']);
+      document.getElementById('resRTO').innerText = getVal(['rto', 'registered_at', 'rto_name']);
 
       document.getElementById('resultContainer').classList.remove('hidden');
+      lucide.createIcons();
     }
   </script>
 </body>
