@@ -3,9 +3,19 @@ const express = require('express');
 const cors = require('cors');
 const axios = require('axios');
 const path = require('path');
+const http = require('http'); // Http server required for Socket.io
+const { Server } = require('socket.io'); // Socket.io Import
 const db = require('./database');
 
 const app = express();
+const server = http.createServer(app); // HTTP Server Instance
+const io = new Server(server, {
+  cors: {
+    origin: "*",
+    methods: ["GET", "POST"]
+  }
+});
+
 app.use(cors());
 app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
@@ -28,15 +38,40 @@ const PLANS = {
 };
 
 // ----------------------------------------------------
+// Real-Time Socket.io Connection & Room Join Logic
+// ----------------------------------------------------
+io.on('connection', (socket) => {
+  // User joins room based on their Unique Account ID / Mobile Number
+  socket.on('join_user_room', (userId) => {
+    if (userId) {
+      const cleanUserId = String(userId).trim().toUpperCase();
+      socket.join(cleanUserId);
+    }
+  });
+});
+
+// Helper function to broadcast balance update to ALL devices under same userId INSTANTLY (<0.1s)
+function emitBalanceUpdate(userId, newBalance) {
+  if (userId) {
+    const cleanUserId = String(userId).trim().toUpperCase();
+    io.to(cleanUserId).emit('balance_updated', {
+      userId: cleanUserId,
+      balance: newBalance
+    });
+  }
+}
+
+// ----------------------------------------------------
 // 1. Health Check Endpoint
 // ----------------------------------------------------
 app.get('/health', (req, res) => res.status(200).send('OK'));
 app.get('/ping', (req, res) => res.status(200).json({ status: 'alive', timestamp: new Date() }));
 
 // ----------------------------------------------------
-// 2. User Balance Sync & Auto Account Creation
+// 2. User Balance Sync & Auto Account Creation (No-Cache Headers)
 // ----------------------------------------------------
 app.get('/api/user/balance', (req, res) => {
+  res.set('Cache-Control', 'no-store, no-cache, must-revalidate, private');
   const userId = req.query.userId;
   if (!userId) return res.status(400).json({ error: 'User ID required' });
 
@@ -153,7 +188,7 @@ app.post('/api/payment/request', async (req, res) => {
 });
 
 // ----------------------------------------------------
-// 5. Telegram Webhook Callback Handler
+// 5. Telegram Webhook Callback Handler (With Realtime Socket Sync)
 // ----------------------------------------------------
 app.post('/telegram/webhook', async (req, res) => {
   const body = req.body;
@@ -185,9 +220,15 @@ app.post('/telegram/webhook', async (req, res) => {
           db.run(
             'INSERT INTO users (userId, balance) VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET balance = balance + ?',
             [txn.userId, addedAmount, addedAmount],
-            async () => {
-              await answerCallback(callback.id, 'Transaction Approved! Balance credited.');
-              await editTelegramMessage(chatId, messageId, callback.message.text + '\n\n✅ *STATUS: APPROVED BY ADMIN*');
+            () => {
+              // Get updated balance and broadcast to ALL user devices in real time
+              db.get('SELECT balance FROM users WHERE userId = ?', [txn.userId], async (bErr, bRow) => {
+                const updatedBalance = bRow ? bRow.balance : 0;
+                emitBalanceUpdate(txn.userId, updatedBalance); // INSTANT SOCKET BROADCAST
+
+                await answerCallback(callback.id, 'Transaction Approved! Balance credited.');
+                await editTelegramMessage(chatId, messageId, callback.message.text + '\n\n✅ *STATUS: APPROVED BY ADMIN*');
+              });
             }
           );
         });
@@ -225,7 +266,7 @@ async function editTelegramMessage(chatId, messageId, text) {
 }
 
 // ----------------------------------------------------
-// 6. Deduct Balance API
+// 6. Deduct Balance API (With Realtime Socket Sync)
 // ----------------------------------------------------
 app.post('/api/user/deduct', (req, res) => {
   const { userId } = req.body;
@@ -241,7 +282,11 @@ app.post('/api/user/deduct', (req, res) => {
 
     db.run('UPDATE users SET balance = balance - 50 WHERE userId = ?', [cleanUserId], function(err2) {
       if (err2) return res.status(500).json({ error: 'Failed to deduct balance' });
-      return res.json({ success: true, remainingBalance: row.balance - 50 });
+
+      const newBalance = row.balance - 50;
+      emitBalanceUpdate(cleanUserId, newBalance); // INSTANT SOCKET BROADCAST
+
+      return res.json({ success: true, remainingBalance: newBalance });
     });
   });
 });
@@ -263,9 +308,9 @@ app.get('/api/vahan', async (req, res) => {
   }
 });
 
-// App Listen
-app.listen(PORT, async () => {
-  console.log(`Server running on port ${PORT}`);
+// App Listen using HTTP Server
+server.listen(PORT, async () => {
+  console.log(`Server running with Socket.io on port ${PORT}`);
   if (TELEGRAM_TOKEN && PUBLIC_SERVER_URL) {
     try {
       await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/setWebhook`, {
