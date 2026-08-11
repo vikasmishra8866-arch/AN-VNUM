@@ -8,7 +8,6 @@
   <meta name="theme-color" content="#031329" />
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://unpkg.com/lucide@latest"></script>
-  <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.3/build/qrcode.min.js"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
 
   <style>
@@ -337,9 +336,8 @@
         <p class="text-xs text-slate-400 mt-1">Select a plan & scan UPI QR Code</p>
       </div>
 
-      <!-- Plan Selection Cards with Clear Offers & Savings -->
+      <!-- Plan Selection Cards -->
       <div class="grid grid-cols-3 gap-2">
-        
         <!-- Starter Plan -->
         <button onclick="selectPlan('starter', 100, 2, 'Starter Pack')" id="plan-starter" class="plan-card p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-center hover:border-cyan-400 transition-all flex flex-col justify-between">
           <div>
@@ -380,7 +378,6 @@
             <span class="text-[9px] text-amber-400 font-semibold">+10 Extra Free!</span>
           </div>
         </button>
-
       </div>
 
       <!-- Guaranteed QR Code Display Section -->
@@ -449,6 +446,7 @@
     let selectedAmount = 500;
     let selectedSearches = 12;
     let qrCountdownInterval = null;
+    let isSearching = false;
 
     const UPI_ID = "9696159863.wallet@phonepe";
     const MERCHANT_NAME = "Vikas Kumar Mishra";
@@ -501,14 +499,15 @@
       });
 
       const selectedEl = document.getElementById(`plan-${planId}`);
-      selectedEl.classList.remove('border-slate-700', 'bg-slate-900/60');
-      selectedEl.classList.add('border-2', 'border-cyan-400', 'bg-cyan-950/30');
+      if (selectedEl) {
+        selectedEl.classList.remove('border-slate-700', 'bg-slate-900/60');
+        selectedEl.classList.add('border-2', 'border-cyan-400', 'bg-cyan-950/30');
+      }
 
       generateDynamicQR(amount);
       startQRTimer(240);
     }
 
-    // 100% Reliable Instant QR Generator (Google Chart API Fallback)
     function generateDynamicQR(amount) {
       const upiUrl = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${amount}&cu=INR&tn=${encodeURIComponent(`Vahan Credit ${userId}`)}`;
       const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUrl)}`;
@@ -566,13 +565,24 @@
     function copySingleValue(elementId) {
       const val = document.getElementById(elementId).innerText;
       if (val && val !== '---') {
-        navigator.clipboard.writeText(val);
+        if (navigator.clipboard && window.isSecureContext) {
+          navigator.clipboard.writeText(val);
+        } else {
+          // Fallback for non-HTTPS or webviews
+          const textArea = document.createElement("textarea");
+          textArea.value = val;
+          document.body.appendChild(textArea);
+          textArea.select();
+          document.execCommand('copy');
+          document.body.removeChild(textArea);
+        }
         showToast(`Copied: ${val}`);
       }
     }
 
     async function handleSearch(event) {
       event.preventDefault();
+      if (isSearching) return;
 
       if (userBalance < 50) {
         showToast("Insufficient Balance! Minimum ₹50 required.");
@@ -583,9 +593,22 @@
       const vehNum = document.getElementById('vehInput').value.trim();
       if (!vehNum) return;
 
+      isSearching = true;
+      const submitBtn = document.getElementById('submitBtn');
+      submitBtn.disabled = true;
+
       document.getElementById('notFoundState').classList.add('hidden');
       document.getElementById('resultContainer').classList.add('hidden');
       document.getElementById('loadingState').classList.remove('hidden');
+
+      // Live search timer counter logic
+      let searchElapsed = 0;
+      const timerEl = document.getElementById('loadTimer');
+      timerEl.innerText = '0';
+      const searchInterval = setInterval(() => {
+        searchElapsed++;
+        timerEl.innerText = searchElapsed;
+      }, 1000);
 
       try {
         const response = await fetch(`/api/vahan?veh=${encodeURIComponent(vehNum)}`);
@@ -610,14 +633,17 @@
       } catch (err) {
         document.getElementById('notFoundState').classList.remove('hidden');
       } finally {
+        clearInterval(searchInterval);
         document.getElementById('loadingState').classList.add('hidden');
+        submitBtn.disabled = false;
+        isSearching = false;
       }
     }
 
     function extractCleanKey(obj, targetKey) {
       for (const key in obj) {
         if (key.toLowerCase().includes(targetKey.toLowerCase())) {
-          return obj[key].replace(/[*`✅]/g, '').trim();
+          return String(obj[key]).replace(/[*`✅]/g, '').trim();
         }
       }
       return 'N/A';
