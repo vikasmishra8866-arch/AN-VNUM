@@ -87,9 +87,9 @@
       <span class="text-sm font-bold text-slate-200 tracking-wide">VAHAN VERIFY</span>
     </div>
 
-    <!-- User Account ID Badge & Wallet Balance Badge -->
+    <!-- Multi-Device User Account ID Badge & Balance Badge -->
     <div class="flex items-center space-x-2">
-      <button onclick="changeAccountID()" class="hidden md:flex items-center space-x-1 bg-slate-900/60 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors">
+      <button onclick="changeAccountID()" class="flex items-center space-x-1 bg-slate-900/60 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors">
         <i data-lucide="user" class="w-3.5 h-3.5"></i>
         <span id="userIdBadge" class="font-mono">ID: ---</span>
       </button>
@@ -108,10 +108,10 @@
     </div>
   </header>
 
-  <!-- Centered Main Wrapper -->
+  <!-- Main Content Wrapper -->
   <main class="w-full max-w-3xl mx-auto space-y-6 my-auto">
 
-    <!-- Search Panel -->
+    <!-- Search Box Panel -->
     <div class="hydro-card rounded-2xl p-5 md:p-6">
       <div class="flex items-center space-x-3 mb-4">
         <div class="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
@@ -167,21 +167,21 @@
       </div>
     </div>
 
-    <!-- Premium "Data Not Found" Animation State -->
+    <!-- Data Not Found State -->
     <div id="notFoundState" class="hidden hydro-card rounded-2xl p-8 text-center space-y-4 border-red-500/40 bg-red-950/20 card-entrance not-found-glow">
       <div class="inline-flex p-4 rounded-full bg-red-500/10 text-red-400 border border-red-500/30">
         <i data-lucide="file-x-2" class="w-10 h-10 animate-bounce"></i>
       </div>
       <div>
         <h3 class="text-xl font-bold text-red-400 tracking-wide">VEHICLE DETAILS NOT FOUND</h3>
-        <p id="notFoundSubText" class="text-xs text-slate-300 mt-2 max-w-md mx-auto leading-relaxed">
+        <p class="text-xs text-slate-300 mt-2 max-w-md mx-auto leading-relaxed">
           No records found matching the requested registration number. <br>
           <strong class="text-emerald-400">Note: No balance was deducted for this search.</strong>
         </p>
       </div>
     </div>
 
-    <!-- Results Display -->
+    <!-- Results Display Panel -->
     <div id="resultContainer" class="hidden space-y-4">
       <div class="flex items-center justify-between px-1">
         <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -214,7 +214,7 @@
                 <span id="resRTO" class="text-sm font-semibold text-slate-200">---</span>
               </div>
             </div>
-            <button onclick="copySingleValue('resRTO')" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors ml-2">
+            <button onclick="copySingleValue('resRTO')" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg ml-2">
               <i data-lucide="copy" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -343,9 +343,8 @@
         <p class="text-xs text-slate-400 mt-1">Select a plan & scan UPI QR Code</p>
       </div>
 
-      <!-- Plan Selection Cards -->
+      <!-- Plan Options -->
       <div class="grid grid-cols-3 gap-2">
-        <!-- Starter Plan -->
         <button onclick="selectPlan('starter', 100, 2, 'Starter Pack')" id="plan-starter" class="plan-card p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-center hover:border-cyan-400 transition-all flex flex-col justify-between">
           <div>
             <span class="text-[9px] text-slate-400 uppercase block font-semibold">STARTER</span>
@@ -354,11 +353,9 @@
           </div>
           <div class="mt-2 pt-2 border-t border-slate-800/80">
             <span class="text-[10px] text-slate-400 block">₹50 / Search</span>
-            <span class="text-[9px] text-slate-500 font-medium">Standard Price</span>
           </div>
         </button>
 
-        <!-- Popular Standard Plan -->
         <button onclick="selectPlan('popular', 500, 12, 'Popular Standard Pack')" id="plan-popular" class="plan-card p-2.5 rounded-xl border-2 border-cyan-400 bg-cyan-950/30 text-center relative flex flex-col justify-between">
           <span class="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-cyan-500 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase">18% SAVINGS</span>
           <div>
@@ -368,11 +365,9 @@
           </div>
           <div class="mt-2 pt-2 border-t border-cyan-800/50">
             <span class="text-[10px] text-emerald-300 font-bold block">₹41 / Search</span>
-            <span class="text-[9px] text-emerald-400 font-semibold">+2 Extra Free!</span>
           </div>
         </button>
 
-        <!-- Best Value VIP Plan -->
         <button onclick="selectPlan('vip', 1000, 30, 'VIP Business Pack')" id="plan-vip" class="plan-card p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-center hover:border-cyan-400 transition-all relative flex flex-col justify-between">
           <span class="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase">33% SAVINGS</span>
           <div>
@@ -382,12 +377,11 @@
           </div>
           <div class="mt-2 pt-2 border-t border-slate-800/80">
             <span class="text-[10px] text-amber-300 font-bold block">₹33 / Search</span>
-            <span class="text-[9px] text-amber-400 font-semibold">+10 Extra Free!</span>
           </div>
         </button>
       </div>
 
-      <!-- Dynamic QR Section -->
+      <!-- Dynamic QR Box -->
       <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 text-center space-y-2">
         <div class="inline-flex justify-center items-center bg-white p-2.5 rounded-xl shadow-md min-h-[160px] min-w-[160px]">
           <img id="qrImage" src="" alt="UPI Payment QR Code" class="w-36 h-36 object-contain" />
@@ -412,7 +406,6 @@
         </div>
       </div>
 
-      <!-- Action Button -->
       <button onclick="submitPaymentAndRedirectWhatsApp()" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-sm glow-button flex items-center justify-center space-x-2">
         <i data-lucide="send" class="w-4 h-4"></i>
         <span>SEND SCREENSHOT ON WHATSAPP</span>
@@ -428,7 +421,7 @@
   <script>
     lucide.createIcons();
 
-    // Context & inspect locks
+    // Prevent context menu & Inspector locks
     document.addEventListener('contextmenu', e => e.preventDefault());
     document.addEventListener('keydown', e => {
       if (
@@ -440,10 +433,10 @@
       }
     });
 
-    // Persistent User Identity Logic for Cross-Device Sync
+    // MULTI-DEVICE WALLET USER ID LOGIC
     let userId = localStorage.getItem('vahan_user_id');
     if (!userId) {
-      userId = prompt("Enter Your Unique Mobile Number / Account ID (for Multi-Device Sync):");
+      userId = prompt("Enter Mobile Number / Account ID to Sync Wallet across devices:");
       if (!userId || userId.trim() === '') {
         userId = 'USR_' + Math.random().toString(36).substring(2, 9).toUpperCase();
       } else {
@@ -455,13 +448,15 @@
     const badgeEl = document.getElementById('userIdBadge');
     if (badgeEl) badgeEl.innerText = `ID: ${userId}`;
 
+    // Switch Account / Sync Another Device function
     function changeAccountID() {
-      const newId = prompt("Enter Mobile / Account ID to sync another device:", userId);
+      const newId = prompt("Enter Mobile / Account ID to sync across devices:", userId);
       if (newId && newId.trim() !== '') {
         userId = newId.trim().toUpperCase();
         localStorage.setItem('vahan_user_id', userId);
         if (badgeEl) badgeEl.innerText = `ID: ${userId}`;
-        fetchUserBalance();
+        fetchUserBalance(); // Instant balance sync on ID change
+        showToast(`Switched Account to: ${userId}`);
       }
     }
 
@@ -477,22 +472,23 @@
     const MERCHANT_NAME = "Vikas Kumar Mishra";
     const WHATSAPP_NUMBER = "918960023923";
 
-    // Live Balance Fetch Function
+    // LIVE BALANCE FETCH FROM SERVER (SYNCED BY USER ID)
     async function fetchUserBalance() {
+      if (!userId) return;
       try {
         const res = await fetch(`/api/user/balance?userId=${encodeURIComponent(userId)}`);
         const data = await res.json();
         userBalance = typeof data.balance === 'number' ? data.balance : 0;
         document.getElementById('walletBalanceDisplay').innerText = `₹${userBalance}`;
       } catch (e) {
-        console.error("Balance Sync Error", e);
+        console.error("Balance sync error:", e);
       }
     }
 
-    // First load fetch
+    // Initial load fetch
     fetchUserBalance();
 
-    // REAL-TIME AUTO SYNC (Every 3 Seconds)
+    // AUTO REFRESH BALANCE EVERY 3 SECONDS FOR CROSS-DEVICE REALTIME SYNC
     setInterval(fetchUserBalance, 3000);
 
     function showToast(msg) {
@@ -540,16 +536,11 @@
       generateDynamicQR(amount);
       startQRTimer(240);
 
-      // Instant Plan Selection Notification to Backend
       try {
         await fetch('/api/notify-plan-click', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            userId: userId,
-            planName: name,
-            amount: amount
-          })
+          body: JSON.stringify({ userId, planName: name, amount })
         });
       } catch (e) {}
     }
@@ -619,7 +610,6 @@
 
     function extractCleanKey(obj, keywords) {
       if (!obj || typeof obj !== 'object') return 'N/A';
-      
       const keyList = Array.isArray(keywords) ? keywords : [keywords];
       
       for (const k in obj) {
@@ -671,7 +661,7 @@
         const data = await response.json();
 
         if (!data || data.status !== "success" || !data.data || !data.data.details) {
-          throw new Error("No vehicle details match the entered registration number.");
+          throw new Error("No vehicle details match.");
         }
 
         const details = data.data.details;
@@ -684,13 +674,13 @@
 
         renderVehicleDetails(details, vehNum);
 
+        // Deduct Balance on Successful Search
         try {
           const deductRes = await fetch('/api/user/deduct', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId })
           });
-          
           const deductData = await deductRes.json();
           if (deductData.success && typeof deductData.remainingBalance === 'number') {
             userBalance = deductData.remainingBalance;
