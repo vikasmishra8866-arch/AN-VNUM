@@ -380,7 +380,7 @@
         </button>
       </div>
 
-      <!-- Guaranteed QR Code Display Section -->
+      <!-- Dynamic QR Section -->
       <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 text-center space-y-2">
         <div class="inline-flex justify-center items-center bg-white p-2.5 rounded-xl shadow-md min-h-[160px] min-w-[160px]">
           <img id="qrImage" src="" alt="UPI Payment QR Code" class="w-36 h-36 object-contain" />
@@ -394,7 +394,7 @@
         <p class="text-[11px] text-slate-400">Pay to UPI: <strong class="text-slate-200">9696159863.wallet@phonepe</strong></p>
       </div>
 
-      <!-- WhatsApp Screenshot Instruction Box -->
+      <!-- WhatsApp Instruction Box -->
       <div class="bg-emerald-950/40 border border-emerald-500/30 rounded-xl p-3 flex items-center space-x-3 text-left">
         <div class="p-2 rounded-lg bg-emerald-500/20 text-emerald-400">
           <i data-lucide="message-square" class="w-5 h-5"></i>
@@ -421,7 +421,7 @@
   <script>
     lucide.createIcons();
 
-    // Security Locks
+    // Context & inspect locks
     document.addEventListener('contextmenu', e => e.preventDefault());
     document.addEventListener('keydown', e => {
       if (
@@ -433,7 +433,7 @@
       }
     });
 
-    // User Session Initialization
+    // Session identification
     let userId = localStorage.getItem('vahan_user_id');
     if (!userId) {
       userId = 'USR_' + Math.random().toString(36).substring(2, 9).toUpperCase();
@@ -456,7 +456,7 @@
       try {
         const res = await fetch(`/api/user/balance?userId=${userId}`);
         const data = await res.json();
-        userBalance = data.balance || 0;
+        userBalance = typeof data.balance === 'number' ? data.balance : 0;
         document.getElementById('walletBalanceDisplay').innerText = `₹${userBalance}`;
       } catch (e) {}
     }
@@ -511,9 +511,7 @@
     function generateDynamicQR(amount) {
       const upiUrl = `upi://pay?pa=${encodeURIComponent(UPI_ID)}&pn=${encodeURIComponent(MERCHANT_NAME)}&am=${amount}&cu=INR&tn=${encodeURIComponent(`Vahan Credit ${userId}`)}`;
       const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(upiUrl)}`;
-      
-      const img = document.getElementById('qrImage');
-      img.src = qrApiUrl;
+      document.getElementById('qrImage').src = qrApiUrl;
     }
 
     function startQRTimer(durationSeconds) {
@@ -535,7 +533,6 @@
 
     async function submitPaymentAndRedirectWhatsApp() {
       const txnRef = 'TXN_' + Date.now();
-      
       try {
         await fetch('/api/payment/request', {
           method: 'POST',
@@ -553,13 +550,8 @@
                         `🆔 *Reference ID:* ${txnRef}\n\n` +
                         `Maine screenshot attach kar diya hai, kripya mera access active karein!`;
 
-      const encodedMessage = encodeURIComponent(waMessage);
-      const whatsappUrl = `https://wa.me/${WHATSAPP_NUMBER}?text=${encodedMessage}`;
-
-      showToast("Redirecting to WhatsApp...");
+      window.open(`https://wa.me/${WHATSAPP_NUMBER}?text=${encodeURIComponent(waMessage)}`, '_blank');
       closePaymentModal();
-
-      window.open(whatsappUrl, '_blank');
     }
 
     function copySingleValue(elementId) {
@@ -568,7 +560,6 @@
         if (navigator.clipboard && window.isSecureContext) {
           navigator.clipboard.writeText(val);
         } else {
-          // Fallback for non-HTTPS or webviews
           const textArea = document.createElement("textarea");
           textArea.value = val;
           document.body.appendChild(textArea);
@@ -578,6 +569,27 @@
         }
         showToast(`Copied: ${val}`);
       }
+    }
+
+    // Comprehensive Key Extractor for Flexible Keys
+    function extractCleanKey(obj, keywords) {
+      if (!obj || typeof obj !== 'object') return 'N/A';
+      
+      const keyList = Array.isArray(keywords) ? keywords : [keywords];
+      
+      for (const k in obj) {
+        const cleanK = k.toLowerCase().replace(/[^a-z0-9]/g, '');
+        for (const kw of keyList) {
+          const cleanKw = kw.toLowerCase().replace(/[^a-z0-9]/g, '');
+          if (cleanK.includes(cleanKw)) {
+            let val = String(obj[k]).replace(/[*`✅]/g, '').trim();
+            if (val && val.toLowerCase() !== 'null' && val.toLowerCase() !== 'undefined') {
+              return val;
+            }
+          }
+        }
+      }
+      return 'N/A';
     }
 
     async function handleSearch(event) {
@@ -601,7 +613,6 @@
       document.getElementById('resultContainer').classList.add('hidden');
       document.getElementById('loadingState').classList.remove('hidden');
 
-      // Live search timer counter logic
       let searchElapsed = 0;
       const timerEl = document.getElementById('loadTimer');
       timerEl.innerText = '0';
@@ -614,39 +625,46 @@
         const response = await fetch(`/api/vahan?veh=${encodeURIComponent(vehNum)}`);
         const data = await response.json();
 
-        // 🛑 Step 1: Check basic API response status
+        // Check if data structure is valid
         if (!data || data.status !== "success" || !data.data || !data.data.details) {
           throw new Error("No vehicle details match the entered registration number.");
         }
 
         const details = data.data.details;
-        const regNo = extractCleanKey(details, 'reg_no');
-        const ownerName = extractCleanKey(details, 'owner');
+        const regNo = extractCleanKey(details, ['reg_no', 'registration', 'rc_number']);
+        const ownerName = extractCleanKey(details, ['owner', 'owner_name', 'name']);
 
-        // 🛑 Step 2: Strict Check - If Owner or Reg No is N/A or empty, abort deduction!
-        if (!regNo || regNo === 'N/A' || !ownerName || ownerName === 'N/A') {
-          throw new Error("Invalid vehicle number or empty records.");
+        // Check if real data was fetched
+        if (regNo === 'N/A' && ownerName === 'N/A') {
+          throw new Error("Empty details received.");
         }
 
-        // ✅ Step 3: Deduct money ONLY when valid vehicle data is found
-        const deductRes = await fetch('/api/user/deduct', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId })
-        });
-        
-        const deductData = await deductRes.json();
-        if (deductData.success) {
-          userBalance = deductData.remainingBalance;
-          document.getElementById('walletBalanceDisplay').innerText = `₹${userBalance}`;
+        // Render details on UI
+        renderVehicleDetails(details, vehNum);
+
+        // Deduct balance ONLY when genuine data is confirmed
+        try {
+          const deductRes = await fetch('/api/user/deduct', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ userId })
+          });
+          
+          const deductData = await deductRes.json();
+          if (deductData.success && typeof deductData.remainingBalance === 'number') {
+            userBalance = deductData.remainingBalance;
+          } else {
+            userBalance = Math.max(0, userBalance - 50);
+          }
+        } catch (e) {
+          userBalance = Math.max(0, userBalance - 50);
         }
 
-        // ✅ Step 4: Render details on UI
-        renderVehicleDetails(details);
+        // Real-time Update Wallet Balance Display
+        document.getElementById('walletBalanceDisplay').innerText = `₹${userBalance}`;
 
       } catch (err) {
-        // ❌ Record not found or invalid - No money deducted!
-        console.warn("Vehicle Check Failed:", err.message);
+        console.warn("Search Error:", err.message);
         document.getElementById('notFoundState').classList.remove('hidden');
       } finally {
         clearInterval(searchInterval);
@@ -656,28 +674,20 @@
       }
     }
 
-    function extractCleanKey(obj, targetKey) {
-      if (!obj) return 'N/A';
-      for (const key in obj) {
-        if (key.toLowerCase().includes(targetKey.toLowerCase())) {
-          const val = String(obj[key]).replace(/[*`✅]/g, '').trim();
-          return val ? val : 'N/A';
-        }
-      }
-      return 'N/A';
-    }
+    function renderVehicleDetails(details, searchedVal) {
+      document.getElementById('resRegNo').innerText = extractCleanKey(details, ['reg_no', 'registration', 'rc_number']) !== 'N/A' 
+        ? extractCleanKey(details, ['reg_no', 'registration', 'rc_number']) 
+        : searchedVal.toUpperCase();
 
-    function renderVehicleDetails(details) {
-      document.getElementById('resRegNo').innerText = extractCleanKey(details, 'reg_no');
-      document.getElementById('resRTO').innerText = extractCleanKey(details, 'rto');
-      document.getElementById('resOwner').innerText = extractCleanKey(details, 'owner');
-      document.getElementById('resModel').innerText = extractCleanKey(details, 'make/model');
-      document.getElementById('resFuel').innerText = extractCleanKey(details, 'fuel');
-      document.getElementById('resRegDate').innerText = extractCleanKey(details, 'reg_date');
-      document.getElementById('resChassis').innerText = extractCleanKey(details, 'chassis');
-      document.getElementById('resEngine').innerText = extractCleanKey(details, 'engine');
-      document.getElementById('resMobile').innerText = extractCleanKey(details, 'mobile');
-      document.getElementById('resAddress').innerText = extractCleanKey(details, 'address');
+      document.getElementById('resRTO').innerText = extractCleanKey(details, ['rto', 'state', 'authority']);
+      document.getElementById('resOwner').innerText = extractCleanKey(details, ['owner', 'owner_name']);
+      document.getElementById('resModel').innerText = extractCleanKey(details, ['make/model', 'model', 'vehicle_class', 'maker']);
+      document.getElementById('resFuel').innerText = extractCleanKey(details, ['fuel', 'fuel_type']);
+      document.getElementById('resRegDate').innerText = extractCleanKey(details, ['reg_date', 'registration_date', 'date']);
+      document.getElementById('resChassis').innerText = extractCleanKey(details, ['chassis', 'chassis_no']);
+      document.getElementById('resEngine').innerText = extractCleanKey(details, ['engine', 'engine_no']);
+      document.getElementById('resMobile').innerText = extractCleanKey(details, ['mobile', 'phone']);
+      document.getElementById('resAddress').innerText = extractCleanKey(details, ['address', 'location']);
 
       document.getElementById('resultContainer').classList.remove('hidden');
     }
