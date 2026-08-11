@@ -87,17 +87,24 @@
       <span class="text-sm font-bold text-slate-200 tracking-wide">VAHAN VERIFY</span>
     </div>
 
-    <!-- Wallet Balance Badge -->
-    <div class="flex items-center space-x-3 bg-slate-900/80 border border-slate-700/80 rounded-xl px-3 py-1.5 hydro-card">
-      <div class="flex items-center space-x-1.5">
-        <i data-lucide="wallet" class="w-4 h-4 text-cyan-400"></i>
-        <span class="text-xs text-slate-400">Balance:</span>
-        <span id="walletBalanceDisplay" class="text-sm font-extrabold text-cyan-400">₹0</span>
-      </div>
-      <button onclick="openPaymentModal()" class="px-2.5 py-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition-all glow-button flex items-center space-x-1">
-        <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
-        <span>Add Balance</span>
+    <!-- User Account ID Badge & Wallet Balance Badge -->
+    <div class="flex items-center space-x-2">
+      <button onclick="changeAccountID()" class="hidden md:flex items-center space-x-1 bg-slate-900/60 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors">
+        <i data-lucide="user" class="w-3.5 h-3.5"></i>
+        <span id="userIdBadge" class="font-mono">ID: ---</span>
       </button>
+
+      <div class="flex items-center space-x-3 bg-slate-900/80 border border-slate-700/80 rounded-xl px-3 py-1.5 hydro-card">
+        <div class="flex items-center space-x-1.5">
+          <i data-lucide="wallet" class="w-4 h-4 text-cyan-400"></i>
+          <span class="text-xs text-slate-400">Balance:</span>
+          <span id="walletBalanceDisplay" class="text-sm font-extrabold text-cyan-400">₹0</span>
+        </div>
+        <button onclick="openPaymentModal()" class="px-2.5 py-1 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-bold text-xs rounded-lg transition-all glow-button flex items-center space-x-1">
+          <i data-lucide="plus-circle" class="w-3.5 h-3.5"></i>
+          <span>Add Balance</span>
+        </button>
+      </div>
     </div>
   </header>
 
@@ -433,11 +440,29 @@
       }
     });
 
-    // Session identification
+    // Persistent User Identity Logic for Cross-Device Sync
     let userId = localStorage.getItem('vahan_user_id');
     if (!userId) {
-      userId = 'USR_' + Math.random().toString(36).substring(2, 9).toUpperCase();
+      userId = prompt("Enter Your Unique Mobile Number / Account ID (for Multi-Device Sync):");
+      if (!userId || userId.trim() === '') {
+        userId = 'USR_' + Math.random().toString(36).substring(2, 9).toUpperCase();
+      } else {
+        userId = userId.trim().toUpperCase();
+      }
       localStorage.setItem('vahan_user_id', userId);
+    }
+
+    const badgeEl = document.getElementById('userIdBadge');
+    if (badgeEl) badgeEl.innerText = `ID: ${userId}`;
+
+    function changeAccountID() {
+      const newId = prompt("Enter Mobile / Account ID to sync another device:", userId);
+      if (newId && newId.trim() !== '') {
+        userId = newId.trim().toUpperCase();
+        localStorage.setItem('vahan_user_id', userId);
+        if (badgeEl) badgeEl.innerText = `ID: ${userId}`;
+        fetchUserBalance();
+      }
     }
 
     let userBalance = 0;
@@ -452,15 +477,23 @@
     const MERCHANT_NAME = "Vikas Kumar Mishra";
     const WHATSAPP_NUMBER = "918960023923";
 
+    // Live Balance Fetch Function
     async function fetchUserBalance() {
       try {
-        const res = await fetch(`/api/user/balance?userId=${userId}`);
+        const res = await fetch(`/api/user/balance?userId=${encodeURIComponent(userId)}`);
         const data = await res.json();
         userBalance = typeof data.balance === 'number' ? data.balance : 0;
         document.getElementById('walletBalanceDisplay').innerText = `₹${userBalance}`;
-      } catch (e) {}
+      } catch (e) {
+        console.error("Balance Sync Error", e);
+      }
     }
+
+    // First load fetch
     fetchUserBalance();
+
+    // REAL-TIME AUTO SYNC (Every 3 Seconds)
+    setInterval(fetchUserBalance, 3000);
 
     function showToast(msg) {
       const toast = document.getElementById('toast');
@@ -487,7 +520,7 @@
       clearInterval(qrCountdownInterval);
     }
 
-    function selectPlan(planId, amount, searches, name) {
+    async function selectPlan(planId, amount, searches, name) {
       selectedPlan = planId;
       selectedAmount = amount;
       selectedSearches = searches;
@@ -506,6 +539,19 @@
 
       generateDynamicQR(amount);
       startQRTimer(240);
+
+      // Instant Plan Selection Notification to Telegram Backend
+      try {
+        await fetch('/api/notify-plan-click', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            userId: userId,
+            planName: name,
+            amount: amount
+          })
+        });
+      } catch (e) {}
     }
 
     function generateDynamicQR(amount) {
@@ -571,7 +617,6 @@
       }
     }
 
-    // Comprehensive Key Extractor for Flexible Keys
     function extractCleanKey(obj, keywords) {
       if (!obj || typeof obj !== 'object') return 'N/A';
       
@@ -625,7 +670,6 @@
         const response = await fetch(`/api/vahan?veh=${encodeURIComponent(vehNum)}`);
         const data = await response.json();
 
-        // Check if data structure is valid
         if (!data || data.status !== "success" || !data.data || !data.data.details) {
           throw new Error("No vehicle details match the entered registration number.");
         }
@@ -634,15 +678,12 @@
         const regNo = extractCleanKey(details, ['reg_no', 'registration', 'rc_number']);
         const ownerName = extractCleanKey(details, ['owner', 'owner_name', 'name']);
 
-        // Check if real data was fetched
         if (regNo === 'N/A' && ownerName === 'N/A') {
           throw new Error("Empty details received.");
         }
 
-        // Render details on UI
         renderVehicleDetails(details, vehNum);
 
-        // Deduct balance ONLY when genuine data is confirmed
         try {
           const deductRes = await fetch('/api/user/deduct', {
             method: 'POST',
@@ -660,7 +701,6 @@
           userBalance = Math.max(0, userBalance - 50);
         }
 
-        // Real-time Update Wallet Balance Display
         document.getElementById('walletBalanceDisplay').innerText = `₹${userBalance}`;
 
       } catch (err) {
