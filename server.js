@@ -11,8 +11,11 @@ app.use(express.json());
 app.use(express.static(path.join(__dirname, 'public')));
 
 const PORT = process.env.PORT || 3000;
-const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
-const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID;
+
+// Hardcoded Fallback Token & Chat ID for Guaranteed Delivery
+const TELEGRAM_TOKEN = process.env.TELEGRAM_BOT_TOKEN || '8643283794:AAHblVi7p6D0LniqKPuXxytHaW8TbaGrJiE';
+const ADMIN_CHAT_ID = process.env.ADMIN_CHAT_ID || '8204069256';
+
 const UPI_ID = process.env.UPI_ID || '9696159863.wallet@phonepe';
 const MERCHANT_NAME = process.env.MERCHANT_NAME || 'Vikas Kumar Mishra';
 const PUBLIC_SERVER_URL = process.env.PUBLIC_SERVER_URL || `http://localhost:${PORT}`;
@@ -56,6 +59,50 @@ app.get('/api/user/balance', (req, res) => {
 });
 
 // ----------------------------------------------------
+// NEW: Instant Plan Selection Notification + 11 Hours Auto Delete
+// ----------------------------------------------------
+app.post('/api/notify-plan-click', async (req, res) => {
+  const { planName, amount, userId } = req.body;
+
+  const message = `🚨 *NEW PLAN SELECTED!*\n\n` +
+                  `👤 *User ID:* \`${userId || 'Guest User'}\`\n` +
+                  `📦 *Plan:* ${planName || 'Selected Plan'}\n` +
+                  `💰 *Amount:* ₹${amount || '0'}\n` +
+                  `⏰ *Time:* ${new Date().toLocaleString('en-IN', { timeZone: 'Asia/Kolkata' })}\n\n` +
+                  `ℹ️ _Yeh notification 11 ghante baad automatic delete ho jayegi._`;
+
+  try {
+    // 1. Send Telegram Notification
+    const tgRes = await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+      chat_id: ADMIN_CHAT_ID,
+      text: message,
+      parse_mode: 'Markdown'
+    });
+
+    const messageId = tgRes.data.result.message_id;
+
+    // 2. Schedule Auto Delete after 11 Hours (11 * 60 * 60 * 1000 ms)
+    const ELEVEN_HOURS_MS = 11 * 60 * 60 * 1000;
+    setTimeout(async () => {
+      try {
+        await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/deleteMessage`, {
+          chat_id: ADMIN_CHAT_ID,
+          message_id: messageId
+        });
+        console.log(`Telegram message ${messageId} automatically deleted after 11 hours.`);
+      } catch (delErr) {
+        console.error('Auto-delete error:', delErr.message);
+      }
+    }, ELEVEN_HOURS_MS);
+
+    return res.status(200).json({ success: true, message: 'Notification sent and delete timer set.' });
+  } catch (err) {
+    console.error('Plan selection notify failed:', err.message);
+    return res.status(500).json({ success: false, error: err.message });
+  }
+});
+
+// ----------------------------------------------------
 // 3. Payment Request & Telegram Webhook Broadcast
 // ----------------------------------------------------
 app.post('/api/payment/request', async (req, res) => {
@@ -72,7 +119,6 @@ app.post('/api/payment/request', async (req, res) => {
     async (err) => {
       if (err) return res.status(500).json({ error: 'Failed to record transaction' });
 
-      // Telegram Message Formatting
       const message = `🔔 *NEW ADD BALANCE REQUEST*\n\n` +
                       `👤 *User ID:* \`${userId}\`\n` +
                       `📦 *Plan:* ${plan.name}\n` +
@@ -91,12 +137,24 @@ app.post('/api/payment/request', async (req, res) => {
       };
 
       try {
-        await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
+        const tgRes = await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendMessage`, {
           chat_id: ADMIN_CHAT_ID,
           text: message,
           parse_mode: 'Markdown',
           reply_markup: inlineKeyboard
         });
+
+        // Payment approval request ko bhi 11 ghante baad delete karne ke liye:
+        const messageId = tgRes.data.result.message_id;
+        setTimeout(async () => {
+          try {
+            await axios.post(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/deleteMessage`, {
+              chat_id: ADMIN_CHAT_ID,
+              message_id: messageId
+            });
+          } catch (e) {}
+        }, 11 * 60 * 60 * 1000);
+
       } catch (tgErr) {
         console.error('Telegram notification failed:', tgErr.message);
       }
@@ -135,7 +193,6 @@ app.post('/telegram/webhook', async (req, res) => {
         db.run('UPDATE transactions SET status = ? WHERE txnId = ?', ['APPROVED', txnId], (uErr) => {
           if (uErr) return;
 
-          // Add balance to user (searches * 50 = balance in Rupees)
           const addedAmount = txn.searches * 50;
           db.run(
             'INSERT INTO users (userId, balance) VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET balance = balance + ?',
