@@ -614,23 +614,39 @@
         const response = await fetch(`/api/vahan?veh=${encodeURIComponent(vehNum)}`);
         const data = await response.json();
 
-        if (data && data.status === "success" && data.data && data.data.details) {
-          const deductRes = await fetch('/api/user/deduct', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ userId })
-          });
-          const deductData = await deductRes.json();
-          if (deductData.success) {
-            userBalance = deductData.remainingBalance;
-            document.getElementById('walletBalanceDisplay').innerText = `₹${userBalance}`;
-          }
-
-          renderVehicleDetails(data.data.details);
-        } else {
+        // 🛑 Step 1: Check basic API response status
+        if (!data || data.status !== "success" || !data.data || !data.data.details) {
           throw new Error("No vehicle details match the entered registration number.");
         }
+
+        const details = data.data.details;
+        const regNo = extractCleanKey(details, 'reg_no');
+        const ownerName = extractCleanKey(details, 'owner');
+
+        // 🛑 Step 2: Strict Check - If Owner or Reg No is N/A or empty, abort deduction!
+        if (!regNo || regNo === 'N/A' || !ownerName || ownerName === 'N/A') {
+          throw new Error("Invalid vehicle number or empty records.");
+        }
+
+        // ✅ Step 3: Deduct money ONLY when valid vehicle data is found
+        const deductRes = await fetch('/api/user/deduct', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ userId })
+        });
+        
+        const deductData = await deductRes.json();
+        if (deductData.success) {
+          userBalance = deductData.remainingBalance;
+          document.getElementById('walletBalanceDisplay').innerText = `₹${userBalance}`;
+        }
+
+        // ✅ Step 4: Render details on UI
+        renderVehicleDetails(details);
+
       } catch (err) {
+        // ❌ Record not found or invalid - No money deducted!
+        console.warn("Vehicle Check Failed:", err.message);
         document.getElementById('notFoundState').classList.remove('hidden');
       } finally {
         clearInterval(searchInterval);
@@ -641,9 +657,11 @@
     }
 
     function extractCleanKey(obj, targetKey) {
+      if (!obj) return 'N/A';
       for (const key in obj) {
         if (key.toLowerCase().includes(targetKey.toLowerCase())) {
-          return String(obj[key]).replace(/[*`✅]/g, '').trim();
+          const val = String(obj[key]).replace(/[*`✅]/g, '').trim();
+          return val ? val : 'N/A';
         }
       }
       return 'N/A';
