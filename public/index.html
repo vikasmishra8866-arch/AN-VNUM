@@ -10,6 +10,10 @@
   <script src="https://unpkg.com/lucide@latest"></script>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet" />
 
+  <!-- Firebase Compatibility SDKs for Realtime Database -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
   <style>
     body {
       font-family: 'Inter', sans-serif;
@@ -87,9 +91,9 @@
       <span class="text-sm font-bold text-slate-200 tracking-wide">VAHAN VERIFY</span>
     </div>
 
-    <!-- Multi-Device User Account ID Badge & Balance Badge -->
+    <!-- User Account ID Badge & Wallet Balance Badge -->
     <div class="flex items-center space-x-2">
-      <button onclick="changeAccountID()" class="flex items-center space-x-1 bg-slate-900/60 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors">
+      <button onclick="changeAccountID()" class="hidden md:flex items-center space-x-1 bg-slate-900/60 border border-slate-800 rounded-xl px-2.5 py-1.5 text-xs text-slate-400 hover:text-cyan-400 transition-colors">
         <i data-lucide="user" class="w-3.5 h-3.5"></i>
         <span id="userIdBadge" class="font-mono">ID: ---</span>
       </button>
@@ -108,10 +112,10 @@
     </div>
   </header>
 
-  <!-- Main Content Wrapper -->
+  <!-- Centered Main Wrapper -->
   <main class="w-full max-w-3xl mx-auto space-y-6 my-auto">
 
-    <!-- Search Box Panel -->
+    <!-- Search Panel -->
     <div class="hydro-card rounded-2xl p-5 md:p-6">
       <div class="flex items-center space-x-3 mb-4">
         <div class="p-2.5 rounded-xl bg-cyan-500/10 text-cyan-400 border border-cyan-500/20">
@@ -167,21 +171,21 @@
       </div>
     </div>
 
-    <!-- Data Not Found State -->
+    <!-- Premium "Data Not Found" Animation State -->
     <div id="notFoundState" class="hidden hydro-card rounded-2xl p-8 text-center space-y-4 border-red-500/40 bg-red-950/20 card-entrance not-found-glow">
       <div class="inline-flex p-4 rounded-full bg-red-500/10 text-red-400 border border-red-500/30">
         <i data-lucide="file-x-2" class="w-10 h-10 animate-bounce"></i>
       </div>
       <div>
         <h3 class="text-xl font-bold text-red-400 tracking-wide">VEHICLE DETAILS NOT FOUND</h3>
-        <p class="text-xs text-slate-300 mt-2 max-w-md mx-auto leading-relaxed">
+        <p id="notFoundSubText" class="text-xs text-slate-300 mt-2 max-w-md mx-auto leading-relaxed">
           No records found matching the requested registration number. <br>
           <strong class="text-emerald-400">Note: No balance was deducted for this search.</strong>
         </p>
       </div>
     </div>
 
-    <!-- Results Display Panel -->
+    <!-- Results Display -->
     <div id="resultContainer" class="hidden space-y-4">
       <div class="flex items-center justify-between px-1">
         <span class="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -214,7 +218,7 @@
                 <span id="resRTO" class="text-sm font-semibold text-slate-200">---</span>
               </div>
             </div>
-            <button onclick="copySingleValue('resRTO')" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg ml-2">
+            <button onclick="copySingleValue('resRTO')" class="p-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors ml-2">
               <i data-lucide="copy" class="w-3.5 h-3.5"></i>
             </button>
           </div>
@@ -343,8 +347,9 @@
         <p class="text-xs text-slate-400 mt-1">Select a plan & scan UPI QR Code</p>
       </div>
 
-      <!-- Plan Options -->
+      <!-- Plan Selection Cards -->
       <div class="grid grid-cols-3 gap-2">
+        <!-- Starter Plan -->
         <button onclick="selectPlan('starter', 100, 2, 'Starter Pack')" id="plan-starter" class="plan-card p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-center hover:border-cyan-400 transition-all flex flex-col justify-between">
           <div>
             <span class="text-[9px] text-slate-400 uppercase block font-semibold">STARTER</span>
@@ -353,9 +358,11 @@
           </div>
           <div class="mt-2 pt-2 border-t border-slate-800/80">
             <span class="text-[10px] text-slate-400 block">₹50 / Search</span>
+            <span class="text-[9px] text-slate-500 font-medium">Standard Price</span>
           </div>
         </button>
 
+        <!-- Popular Standard Plan -->
         <button onclick="selectPlan('popular', 500, 12, 'Popular Standard Pack')" id="plan-popular" class="plan-card p-2.5 rounded-xl border-2 border-cyan-400 bg-cyan-950/30 text-center relative flex flex-col justify-between">
           <span class="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-cyan-500 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase">18% SAVINGS</span>
           <div>
@@ -365,9 +372,11 @@
           </div>
           <div class="mt-2 pt-2 border-t border-cyan-800/50">
             <span class="text-[10px] text-emerald-300 font-bold block">₹41 / Search</span>
+            <span class="text-[9px] text-emerald-400 font-semibold">+2 Extra Free!</span>
           </div>
         </button>
 
+        <!-- Best Value VIP Plan -->
         <button onclick="selectPlan('vip', 1000, 30, 'VIP Business Pack')" id="plan-vip" class="plan-card p-2.5 rounded-xl border border-slate-700 bg-slate-900/60 text-center hover:border-cyan-400 transition-all relative flex flex-col justify-between">
           <span class="absolute -top-2.5 left-1/2 -translate-x-1/2 bg-amber-500 text-slate-950 text-[8px] font-black px-2 py-0.5 rounded-full uppercase">33% SAVINGS</span>
           <div>
@@ -377,11 +386,12 @@
           </div>
           <div class="mt-2 pt-2 border-t border-slate-800/80">
             <span class="text-[10px] text-amber-300 font-bold block">₹33 / Search</span>
+            <span class="text-[9px] text-amber-400 font-semibold">+10 Extra Free!</span>
           </div>
         </button>
       </div>
 
-      <!-- Dynamic QR Box -->
+      <!-- Dynamic QR Section -->
       <div class="bg-slate-900/80 p-3.5 rounded-xl border border-slate-800 text-center space-y-2">
         <div class="inline-flex justify-center items-center bg-white p-2.5 rounded-xl shadow-md min-h-[160px] min-w-[160px]">
           <img id="qrImage" src="" alt="UPI Payment QR Code" class="w-36 h-36 object-contain" />
@@ -406,6 +416,7 @@
         </div>
       </div>
 
+      <!-- Action Button -->
       <button onclick="submitPaymentAndRedirectWhatsApp()" class="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold rounded-xl text-sm glow-button flex items-center justify-center space-x-2">
         <i data-lucide="send" class="w-4 h-4"></i>
         <span>SEND SCREENSHOT ON WHATSAPP</span>
@@ -419,9 +430,25 @@
   </div>
 
   <script>
+    // --- Firebase Initialization ---
+    const firebaseConfig = {
+      apiKey: "AIzaSyDMp13LuOu6HfucvtUv0YLKhp2VXdXCEd4",
+      authDomain: "vahan-project-5eb91.firebaseapp.com",
+      databaseURL: "https://vahan-project-5eb91-default-rtdb.firebaseio.com",
+      projectId: "vahan-project-5eb91",
+      storageBucket: "vahan-project-5eb91.firebasestorage.app",
+      messagingSenderId: "783581490050",
+      appId: "1:783581490050:web:15992fb114007d90d73d9b"
+    };
+
+    if (!firebase.apps.length) {
+      firebase.initializeApp(firebaseConfig);
+    }
+    const db = firebase.database();
+
     lucide.createIcons();
 
-    // Prevent context menu & Inspector locks
+    // Context & inspect locks
     document.addEventListener('contextmenu', e => e.preventDefault());
     document.addEventListener('keydown', e => {
       if (
@@ -433,10 +460,10 @@
       }
     });
 
-    // MULTI-DEVICE WALLET USER ID LOGIC
+    // Persistent User Identity Logic for Cross-Device Sync
     let userId = localStorage.getItem('vahan_user_id');
     if (!userId) {
-      userId = prompt("Enter Mobile Number / Account ID to Sync Wallet across devices:");
+      userId = prompt("Enter Your Unique Mobile Number / Account ID (for Multi-Device Sync):");
       if (!userId || userId.trim() === '') {
         userId = 'USR_' + Math.random().toString(36).substring(2, 9).toUpperCase();
       } else {
@@ -448,15 +475,13 @@
     const badgeEl = document.getElementById('userIdBadge');
     if (badgeEl) badgeEl.innerText = `ID: ${userId}`;
 
-    // Switch Account / Sync Another Device function
     function changeAccountID() {
-      const newId = prompt("Enter Mobile / Account ID to sync across devices:", userId);
+      const newId = prompt("Enter Mobile / Account ID to sync another device:", userId);
       if (newId && newId.trim() !== '') {
         userId = newId.trim().toUpperCase();
         localStorage.setItem('vahan_user_id', userId);
         if (badgeEl) badgeEl.innerText = `ID: ${userId}`;
-        fetchUserBalance(); // Instant balance sync on ID change
-        showToast(`Switched Account to: ${userId}`);
+        fetchUserBalance();
       }
     }
 
@@ -472,23 +497,22 @@
     const MERCHANT_NAME = "Vikas Kumar Mishra";
     const WHATSAPP_NUMBER = "918960023923";
 
-    // LIVE BALANCE FETCH FROM SERVER (SYNCED BY USER ID)
+    // Live Balance Fetch Function (Syncs with Firebase)
     async function fetchUserBalance() {
-      if (!userId) return;
       try {
         const res = await fetch(`/api/user/balance?userId=${encodeURIComponent(userId)}`);
         const data = await res.json();
         userBalance = typeof data.balance === 'number' ? data.balance : 0;
         document.getElementById('walletBalanceDisplay').innerText = `₹${userBalance}`;
       } catch (e) {
-        console.error("Balance sync error:", e);
+        console.error("Balance Sync Error", e);
       }
     }
 
-    // Initial load fetch
+    // First load fetch
     fetchUserBalance();
 
-    // AUTO REFRESH BALANCE EVERY 3 SECONDS FOR CROSS-DEVICE REALTIME SYNC
+    // REAL-TIME AUTO SYNC (Every 3 Seconds)
     setInterval(fetchUserBalance, 3000);
 
     function showToast(msg) {
@@ -536,11 +560,16 @@
       generateDynamicQR(amount);
       startQRTimer(240);
 
+      // Instant Plan Selection Notification to Backend
       try {
         await fetch('/api/notify-plan-click', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ userId, planName: name, amount })
+          body: JSON.stringify({
+            userId: userId,
+            planName: name,
+            amount: amount
+          })
         });
       } catch (e) {}
     }
@@ -610,6 +639,7 @@
 
     function extractCleanKey(obj, keywords) {
       if (!obj || typeof obj !== 'object') return 'N/A';
+      
       const keyList = Array.isArray(keywords) ? keywords : [keywords];
       
       for (const k in obj) {
@@ -661,7 +691,7 @@
         const data = await response.json();
 
         if (!data || data.status !== "success" || !data.data || !data.data.details) {
-          throw new Error("No vehicle details match.");
+          throw new Error("No vehicle details match the entered registration number.");
         }
 
         const details = data.data.details;
@@ -674,13 +704,13 @@
 
         renderVehicleDetails(details, vehNum);
 
-        // Deduct Balance on Successful Search
         try {
           const deductRes = await fetch('/api/user/deduct', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ userId })
           });
+          
           const deductData = await deductRes.json();
           if (deductData.success && typeof deductData.remainingBalance === 'number') {
             userBalance = deductData.remainingBalance;
@@ -705,24 +735,19 @@
     }
 
     function renderVehicleDetails(details, searchedVal) {
-      const getVal = (keys) => extractCleanKey(details, keys);
-
-      document.getElementById('resRegNo').innerText = getVal(['reg_no', 'registration', 'rc_number']) !== 'N/A' 
-        ? getVal(['reg_no', 'registration', 'rc_number']) 
-        : searchedVal.toUpperCase();
-
-      document.getElementById('resOwner').innerText = getVal(['owner', 'owner_name', 'name']);
-      document.getElementById('resModel').innerText = getVal(['maker_model', 'model', 'vehicle_class', 'desc']);
-      document.getElementById('resFuel').innerText = getVal(['fuel', 'fuel_type']);
-      document.getElementById('resRegDate').innerText = getVal(['registration_date', 'reg_date', 'date']);
-      document.getElementById('resChassis').innerText = getVal(['chassis', 'chassis_number', 'chassis_no']);
-      document.getElementById('resEngine').innerText = getVal(['engine', 'engine_number', 'engine_no']);
-      document.getElementById('resMobile').innerText = getVal(['mobile', 'phone', 'contact']);
-      document.getElementById('resAddress').innerText = getVal(['address', 'present_address', 'permanent_address']);
-      document.getElementById('resRTO').innerText = getVal(['rto', 'registered_at', 'rto_name']);
+      document.getElementById('resRegNo').innerText = extractCleanKey(details, ['reg_no', 'registration', 'rc_number']) !== 'N/A'
+        ? extractCleanKey(details, ['reg_no', 'registration', 'rc_number']) : searchedVal;
+      document.getElementById('resRTO').innerText = extractCleanKey(details, ['rto', 'rto_name', 'authority', 'state']);
+      document.getElementById('resOwner').innerText = extractCleanKey(details, ['owner', 'owner_name', 'name']);
+      document.getElementById('resModel').innerText = extractCleanKey(details, ['model', 'maker', 'vehicle_class', 'description']);
+      document.getElementById('resFuel').innerText = extractCleanKey(details, ['fuel', 'fuel_type', 'type']);
+      document.getElementById('resRegDate').innerText = extractCleanKey(details, ['reg_date', 'registration_date', 'date']);
+      document.getElementById('resChassis').innerText = extractCleanKey(details, ['chassis', 'chassis_no', 'chassis_number']);
+      document.getElementById('resEngine').innerText = extractCleanKey(details, ['engine', 'engine_no', 'engine_number']);
+      document.getElementById('resMobile').innerText = extractCleanKey(details, ['mobile', 'phone', 'contact']);
+      document.getElementById('resAddress').innerText = extractCleanKey(details, ['address', 'present_address', 'permanent_address']);
 
       document.getElementById('resultContainer').classList.remove('hidden');
-      lucide.createIcons();
     }
   </script>
 </body>
