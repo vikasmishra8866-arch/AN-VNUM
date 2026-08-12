@@ -28,6 +28,45 @@ const PLANS = {
 };
 
 // ----------------------------------------------------
+// LIVE REALTIME SYNC ENGINE (SSE - Active Clients)
+// ----------------------------------------------------
+let clients = [];
+
+function sendLiveBalanceToAll(userId, newBalance) {
+  clients.forEach(client => {
+    if (client.userId === userId) {
+      client.res.write(`data: ${JSON.stringify({ userId, balance: newBalance })}\n\n`);
+    }
+  });
+}
+
+// Live Stream Endpoint for Devices
+app.get('/api/user/live-balance', (req, res) => {
+  const userId = req.query.userId;
+  if (!userId) return res.status(400).send('UserId required');
+
+  const cleanUserId = String(userId).trim().toUpperCase();
+
+  res.setHeader('Content-Type', 'text/event-stream');
+  res.setHeader('Cache-Control', 'no-cache, no-transform');
+  res.setHeader('Connection', 'keep-alive');
+  res.setHeader('Access-Control-Allow-Origin', '*');
+
+  // Initial Sync
+  db.get('SELECT balance FROM users WHERE userId = ?', [cleanUserId], (err, row) => {
+    const currentBal = row ? row.balance : 0;
+    res.write(`data: ${JSON.stringify({ userId: cleanUserId, balance: currentBal })}\n\n`);
+  });
+
+  const newClient = { id: Date.now(), userId: cleanUserId, res };
+  clients.push(newClient);
+
+  req.on('close', () => {
+    clients = clients.filter(c => c.id !== newClient.id);
+  });
+});
+
+// ----------------------------------------------------
 // 1. Health Check Endpoint
 // ----------------------------------------------------
 app.get('/health', (req, res) => res.status(200).send('OK'));
@@ -37,6 +76,10 @@ app.get('/ping', (req, res) => res.status(200).json({ status: 'alive', timestamp
 // 2. User Balance Sync & Auto Account Creation
 // ----------------------------------------------------
 app.get('/api/user/balance', (req, res) => {
+  res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, proxy-revalidate');
+  res.setHeader('Pragma', 'no-cache');
+  res.setHeader('Expires', '0');
+
   const userId = req.query.userId;
   if (!userId) return res.status(400).json({ error: 'User ID required' });
 
@@ -56,7 +99,7 @@ app.get('/api/user/balance', (req, res) => {
 });
 
 // ----------------------------------------------------
-// 3. Instant Plan Selection Notification (Telegram + Auto Delete)
+// 3. Instant Plan Selection Notification
 // ----------------------------------------------------
 app.post('/api/notify-plan-click', async (req, res) => {
   const { planName, amount, userId } = req.body;
@@ -153,7 +196,7 @@ app.post('/api/payment/request', async (req, res) => {
 });
 
 // ----------------------------------------------------
-// 5. Telegram Webhook Callback Handler
+// 5. Telegram Webhook Callback Handler (Auto Broadcast Live Updates)
 // ----------------------------------------------------
 app.post('/telegram/webhook', async (req, res) => {
   const body = req.body;
@@ -185,9 +228,15 @@ app.post('/telegram/webhook', async (req, res) => {
           db.run(
             'INSERT INTO users (userId, balance) VALUES (?, ?) ON CONFLICT(userId) DO UPDATE SET balance = balance + ?',
             [txn.userId, addedAmount, addedAmount],
-            async () => {
-              await answerCallback(callback.id, 'Transaction Approved! Balance credited.');
-              await editTelegramMessage(chatId, messageId, callback.message.text + '\n\n✅ *STATUS: APPROVED BY ADMIN*');
+            () => {
+              // Fetch latest balance and broadcast to ALL CONNECTED DEVICES LIVE
+              db.get('SELECT balance FROM users WHERE userId = ?', [txn.userId], async (bErr, row) => {
+                if (row) {
+                  sendLiveBalanceToAll(txn.userId, row.balance);
+                }
+                await answerCallback(callback.id, 'Transaction Approved! Balance credited.');
+                await editTelegramMessage(chatId, messageId, callback.message.text + '\n\n✅ *STATUS: APPROVED BY ADMIN*');
+              });
             }
           );
         });
@@ -225,7 +274,7 @@ async function editTelegramMessage(chatId, messageId, text) {
 }
 
 // ----------------------------------------------------
-// 6. Deduct Balance API
+// 6. Deduct Balance API (Auto Push Live Update)
 // ----------------------------------------------------
 app.post('/api/user/deduct', (req, res) => {
   const { userId } = req.body;
@@ -239,9 +288,14 @@ app.post('/api/user/deduct', (req, res) => {
       return res.status(402).json({ error: 'Insufficient balance. Minimum ₹50 required.' });
     }
 
-    db.run('UPDATE users SET balance = balance - 50 WHERE userId = ?', [cleanUserId], function(err2) {
+    const updatedBal = row.balance - 50;
+    db.run('UPDATE users SET balance = ? WHERE userId = ?', [updatedBal, cleanUserId], function(err2) {
       if (err2) return res.status(500).json({ error: 'Failed to deduct balance' });
-      return res.json({ success: true, remainingBalance: row.balance - 50 });
+      
+      // Send real-time push to all devices
+      sendLiveBalanceToAll(cleanUserId, updatedBal);
+
+      return res.json({ success: true, remainingBalance: updatedBal });
     });
   });
 });
